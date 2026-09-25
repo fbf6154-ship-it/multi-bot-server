@@ -1,0 +1,18 @@
+{
+  "name": "render-bot-hoster",
+  "version": "1.0.0",
+  "description": "24/7 Professional Multi-Bot Hosting Platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "node-telegram-bot-api": "^0.66.0",
+    "telegraf": "^4.16.3"
+  }
+      }
