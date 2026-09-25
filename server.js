@@ -42,7 +42,7 @@ function saveBots(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// ইউনিভার্সাল বট রানার (.js এবং .py দুইটাই রান করবে)
+// ইউনিভার্সাল বট লঞ্চার
 function launchBot(bot) {
     if (runningProcesses.has(bot.id)) {
         try { runningProcesses.get(bot.id).kill(); } catch (e) {}
@@ -56,11 +56,7 @@ function launchBot(bot) {
         return;
     }
 
-    // ফাইল কি পাইথন নাকি জাভাস্ক্রিপ্ট তা নির্ধারণ করা
-    let runner = 'node';
-    if (bot.filename.endsWith('.py')) {
-        runner = 'python3';
-    }
+    let runner = bot.filename.endsWith('.py') ? 'python3' : 'node';
 
     const processInstance = spawn(runner, [filePath], {
         env: { ...process.env, BOT_TOKEN: bot.token }
@@ -81,13 +77,16 @@ function launchBot(bot) {
     });
 }
 
-app.get('/ping', (req, res) => res.send('Universal Server Running 24/7!'));
+// UptimeRobot Keep-Alive
+app.get('/ping', (req, res) => res.send('Active 24/7!'));
 
+// চলমান সব বটের লিস্ট
 app.get('/api/bots', (req, res) => {
     const bots = getBots().map(b => ({
         id: b.id,
         name: b.name,
         filename: b.filename,
+        token: b.token,
         createdAt: b.createdAt,
         type: b.filename.endsWith('.py') ? 'Python' : 'Node.js',
         status: runningProcesses.has(b.id) ? 'Active' : 'Restarting'
@@ -95,6 +94,27 @@ app.get('/api/bots', (req, res) => {
     res.json(bots);
 });
 
+// নির্দিষ্ট একটি বটের সম্পূর্ণ ডাটা ও কোড পাওয়ার API
+app.get('/api/bots/:id', (req, res) => {
+    const bot = getBots().find(b => b.id === req.params.id);
+    if (!bot) return res.status(404).json({ error: 'বট পাওয়া যায়নি!' });
+
+    const filePath = path.join(BOTS_DIR, bot.filename);
+    let code = '';
+    if (fs.existsSync(filePath)) {
+        code = fs.readFileSync(filePath, 'utf-8');
+    }
+
+    res.json({
+        id: bot.id,
+        name: bot.name,
+        token: bot.token,
+        filename: bot.filename,
+        code: code
+    });
+});
+
+// নতুন বট আপলোড
 app.post('/api/upload', upload.single('botFile'), (req, res) => {
     const { botName, botToken, botCode, codeType } = req.body;
     let filename = '';
@@ -106,7 +126,7 @@ app.post('/api/upload', upload.single('botFile'), (req, res) => {
         filename = Date.now() + '-bot' + ext;
         fs.writeFileSync(path.join(BOTS_DIR, filename), botCode);
     } else {
-        return res.status(400).json({ error: 'ফাইল আপলোড করুন অথবা কোড পেস্ট করুন!' });
+        return res.status(400).json({ error: 'ফাইল আপলোড করুন অথবা কোড লিখুন!' });
     }
 
     if (!botName || !botToken) {
@@ -127,9 +147,35 @@ app.post('/api/upload', upload.single('botFile'), (req, res) => {
 
     launchBot(newBot);
 
-    res.json({ success: true, message: `${botName} সফলভাবে হোস্ট হয়েছে!` });
+    res.json({ success: true, message: `${botName} সফলভাবে লাইভ হয়েছে!` });
 });
 
+// রানিং বটের কোড এবং টোকেন এডিট ও সাথে সাথে রিস্টার্ট করার API
+app.post('/api/bots/:id/edit', (req, res) => {
+    const { botName, botToken, botCode } = req.body;
+    const { id } = req.params;
+
+    let bots = getBots();
+    const index = bots.findIndex(b => b.id === id);
+
+    if (index === -1) return res.status(404).json({ error: 'বট পাওয়া যায়নি!' });
+
+    // তথ্য আপডেট করা
+    bots[index].name = botName.trim();
+    bots[index].token = botToken.trim();
+    saveBots(bots);
+
+    // কোড ফাইল ওভাররাইট করা
+    const filePath = path.join(BOTS_DIR, bots[index].filename);
+    fs.writeFileSync(filePath, botCode, 'utf-8');
+
+    // নতুন কোড ও টোকেন দিয়ে তৎক্ষণাৎ রিস্টার্ট দেওয়া
+    launchBot(bots[index]);
+
+    res.json({ success: true, message: 'বট সফলভাবে আপডেট ও নতুন করে রান হয়েছে!' });
+});
+
+// বট ডিলিট
 app.delete('/api/bots/:id', (req, res) => {
     const { id } = req.params;
     let bots = getBots();
@@ -151,7 +197,7 @@ app.delete('/api/bots/:id', (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 ইউনিভার্সাল সার্ভার লাইভ হয়েছে পোর্ট: ${PORT}`);
+    console.log(`🚀 ইউনিভার্সাল এডিটেবল সার্ভার চালু হয়েছে পোর্ট: ${PORT}`);
     const bots = getBots();
     bots.forEach(bot => launchBot(bot));
 });
