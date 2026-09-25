@@ -10,7 +10,6 @@ const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'database.json');
 const BOTS_DIR = path.join(__dirname, 'uploaded_bots');
 
-// ফোল্ডার ও ডেটাবেস তৈরি
 if (!fs.existsSync(BOTS_DIR)) fs.mkdirSync(BOTS_DIR);
 if (!fs.existsSync(DB_FILE)) fs.writeFileSync(DB_FILE, '[]');
 
@@ -19,11 +18,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ফাইল আপলোড কনফিগারেশন
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, BOTS_DIR),
     filename: (req, file, cb) => {
-        const cleanName = Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
+        const ext = path.extname(file.originalname);
+        const cleanName = Date.now() + '-' + path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9]/g, '_') + ext;
         cb(null, cleanName);
     }
 });
@@ -43,15 +42,13 @@ function saveBots(data) {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// বট ২৪/৭ ব্যাকগ্রাউন্ডে চালানোর ফাংশন
+// ইউনিভার্সাল বট রানার (.js এবং .py দুইটাই রান করবে)
 function launchBot(bot) {
     if (runningProcesses.has(bot.id)) {
-        try {
-            runningProcesses.get(bot.id).kill();
-        } catch (e) {}
+        try { runningProcesses.get(bot.id).kill(); } catch (e) {}
     }
 
-    console.log(`[STARTING] ${bot.name} চালু করা হচ্ছে...`);
+    console.log(`[STARTING] ${bot.name} (${bot.filename}) চালু করা হচ্ছে...`);
     const filePath = path.join(BOTS_DIR, bot.filename);
 
     if (!fs.existsSync(filePath)) {
@@ -59,7 +56,13 @@ function launchBot(bot) {
         return;
     }
 
-    const processInstance = spawn('node', [filePath], {
+    // ফাইল কি পাইথন নাকি জাভাস্ক্রিপ্ট তা নির্ধারণ করা
+    let runner = 'node';
+    if (bot.filename.endsWith('.py')) {
+        runner = 'python3';
+    }
+
+    const processInstance = spawn(runner, [filePath], {
         env: { ...process.env, BOT_TOKEN: bot.token }
     });
 
@@ -78,33 +81,32 @@ function launchBot(bot) {
     });
 }
 
-// UptimeRobot এর জন্য Keep-Alive রুট
-app.get('/ping', (req, res) => res.send('Server is Running 24/7!'));
+app.get('/ping', (req, res) => res.send('Universal Server Running 24/7!'));
 
-// চলমান বটগুলোর তালিকা API
 app.get('/api/bots', (req, res) => {
     const bots = getBots().map(b => ({
         id: b.id,
         name: b.name,
         filename: b.filename,
         createdAt: b.createdAt,
+        type: b.filename.endsWith('.py') ? 'Python' : 'Node.js',
         status: runningProcesses.has(b.id) ? 'Active' : 'Restarting'
     }));
     res.json(bots);
 });
 
-// নতুন বট আপলোড ও রান করার API
 app.post('/api/upload', upload.single('botFile'), (req, res) => {
-    const { botName, botToken, botCode } = req.body;
+    const { botName, botToken, botCode, codeType } = req.body;
     let filename = '';
 
     if (req.file) {
         filename = req.file.filename;
     } else if (botCode && botCode.trim() !== '') {
-        filename = Date.now() + '-bot.js';
+        const ext = codeType === 'python' ? '.py' : '.js';
+        filename = Date.now() + '-bot' + ext;
         fs.writeFileSync(path.join(BOTS_DIR, filename), botCode);
     } else {
-        return res.status(400).json({ error: 'ফাইল আপলোড করুন অথবা কোড লিখুন!' });
+        return res.status(400).json({ error: 'ফাইল আপলোড করুন অথবা কোড পেস্ট করুন!' });
     }
 
     if (!botName || !botToken) {
@@ -125,10 +127,9 @@ app.post('/api/upload', upload.single('botFile'), (req, res) => {
 
     launchBot(newBot);
 
-    res.json({ success: true, message: `${botName} সফলভাবে লাইভ হয়েছে!` });
+    res.json({ success: true, message: `${botName} সফলভাবে হোস্ট হয়েছে!` });
 });
 
-// বট ডিলিট করার API
 app.delete('/api/bots/:id', (req, res) => {
     const { id } = req.params;
     let bots = getBots();
@@ -149,9 +150,8 @@ app.delete('/api/bots/:id', (req, res) => {
     res.status(404).json({ error: 'বট পাওয়া যায়নি!' });
 });
 
-// সার্ভার চালু করা
 app.listen(PORT, () => {
-    console.log(`🚀 মাস্টার সার্ভার লাইভ হয়েছে পোর্ট: ${PORT}`);
+    console.log(`🚀 ইউনিভার্সাল সার্ভার লাইভ হয়েছে পোর্ট: ${PORT}`);
     const bots = getBots();
     bots.forEach(bot => launchBot(bot));
 });
