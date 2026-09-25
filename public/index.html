@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24/7 Bot Hosting Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+
+<div class="max-w-4xl mx-auto space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+        <div>
+            <h1 class="text-2xl font-bold text-sky-400 flex items-center gap-2">
+                <i class="fa-solid fa-robot"></i> 24/7 অটোমেটিক বট হোস্টিং
+            </h1>
+            <p class="text-xs text-slate-400 mt-1">ফাইল আপলোড করলেই ব্যাকগ্রাউন্ডে স্বয়ংক্রিয়ভাবে বট লাইভ থাকবে</p>
+        </div>
+        <div class="flex items-center gap-2 bg-emerald-950 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-800">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> সার্ভার অনলাইন
+        </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+
+        <!-- Upload Form -->
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+            <h2 class="text-lg font-bold text-slate-200 mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up text-sky-400"></i> নতুন বট হোস্ট করুন
+            </h2>
+
+            <form id="uploadForm" class="space-y-4">
+                <div>
+                    <label class="text-xs font-medium text-slate-300">বটের নাম</label>
+                    <input type="text" id="botName" placeholder="যেমন: My Telegram Bot" required
+                           class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="text-xs font-medium text-slate-300">বট API টোকেন</label>
+                    <input type="text" id="botToken" placeholder="BotFather থেকে পাওয়া টোকেন দিন" required
+                           class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-sky-500">
+                </div>
+
+                <div>
+                    <label class="text-xs font-medium text-slate-300">বটের .js ফাইল দিন</label>
+                    <input type="file" id="botFile" accept=".js"
+                           class="w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-sky-600 file:text-white hover:file:bg-sky-500">
+                </div>
+
+                <div class="text-center text-xs text-slate-500 font-semibold">— অথবা কোড পেস্ট করুন —</div>
+
+                <div>
+                    <textarea id="botCode" rows="4" placeholder="// এখানে সরাসরি আপনার বটের জাভাস্ক্রিপ্ট কোড পেস্ট করতে পারেন..."
+                              class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs font-mono focus:outline-none focus:border-sky-500"></textarea>
+                </div>
+
+                <button type="submit" id="submitBtn"
+                        class="w-full bg-sky-500 hover:bg-sky-600 text-slate-900 font-bold py-2.5 rounded-lg text-sm transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i> হোস্ট ও রান করুন
+                </button>
+            </form>
+        </div>
+
+        <!-- Active Bots List -->
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-lg">
+            <h2 class="text-lg font-bold text-slate-200 mb-4 flex items-center justify-between">
+                <span class="flex items-center gap-2"><i class="fa-solid fa-server text-emerald-400"></i> চলমান বটসমূহ</span>
+                <span id="botCount" class="text-xs bg-slate-700 px-2 py-1 rounded-md text-slate-300">0</span>
+            </h2>
+
+            <div id="botsContainer" class="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                <p class="text-xs text-slate-500 text-center py-8">লোড হচ্ছে...</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    async function loadBots() {
+        const res = await fetch('/api/bots');
+        const bots = await res.json();
+        const container = document.getElementById('botsContainer');
+        document.getElementById('botCount').innerText = bots.length;
+
+        if (bots.length === 0) {
+            container.innerHTML = '<p class="text-xs text-slate-500 text-center py-8">এখনো কোনো বট চালু করা হয়নি।</p>';
+            return;
+        }
+
+        container.innerHTML = bots.map(b => `
+            <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-700/60 flex items-center justify-between">
+                <div>
+                    <div class="font-bold text-sm text-slate-100 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span> ${b.name}
+                    </div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">যুক্ত হয়েছে: ${b.createdAt}</div>
+                </div>
+                <button onclick="deleteBot('${b.id}')" class="text-rose-400 hover:text-rose-300 p-2 text-sm" title="বন্ধ ও ডিলিট করুন">
+                    <i class="fa-solid fa-trash-can"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> আপলোড হচ্ছে...';
+
+        const formData = new FormData();
+        formData.append('botName', document.getElementById('botName').value);
+        formData.append('botToken', document.getElementById('botToken').value);
+        
+        const file = document.getElementById('botFile').files[0];
+        if (file) formData.append('botFile', file);
+        formData.append('botCode', document.getElementById('botCode').value);
+
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const result = await res.json();
+
+        if (result.success) {
+            alert(result.message);
+            document.getElementById('uploadForm').reset();
+            loadBots();
+        } else {
+            alert(result.error || 'সমস্যা হয়েছে!');
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> হোস্ট ও রান করুন';
+    });
+
+    async function deleteBot(id) {
+        if (!confirm('আপনি কি সত্যিই এই বটটি বন্ধ করতে চান?')) return;
+        await fetch('/api/bots/' + id, { method: 'DELETE' });
+        loadBots();
+    }
+
+    loadBots();
+    setInterval(loadBots, 10000); // প্রতি ১০ সেকেন্ডে অটো রিফ্রেশ
+</script>
+
+</body>
+</html>
